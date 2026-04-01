@@ -127,34 +127,33 @@ class UnifiedState(TypedDict):
 4. **LLM reranking** → выбор наиболее релевантной задачи из кандидатов.
 5. **Threshold check** → если сходство < `0.75` → запрос уточнения у пользователя.
 
-
-
 ## Метрики
 
 ### Бизнес-метрики
-
-# Бизнес-метрики
 ```prometheus
 taskpilot_messages_received_total{group_id, source}
 taskpilot_tasks_created_total{group_id, source}
 taskpilot_tasks_updated_total{group_id}
 taskpilot_dependencies_created_total
 ```
-# Производительность
+
+### Производительность
 ```prometheus
 taskpilot_agent_latency_seconds{quantile="0.5|0.95|0.99"}
 taskpilot_llm_api_latency_seconds{model, status}
 taskpilot_queue_size{queue_name}
 taskpilot_faiss_search_latency_seconds
 ```
-# Надёжность
+
+### Надёжность
 ```prometheus
 taskpilot_llm_api_errors_total{error_type="timeout|5xx|invalid"}
 taskpilot_circuit_breaker_state{service="llm|db|redis"}
 taskpilot_health_check_status{component}
 taskpilot_retry_count_total{task_name}
 ```
-# Ресурсы
+
+### Ресурсы
 ```prometheus
 taskpilot_db_pool_connections{state="active|idle"}
 taskpilot_worker_processes{hostname}
