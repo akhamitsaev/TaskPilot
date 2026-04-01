@@ -129,14 +129,6 @@ class UnifiedState(TypedDict):
 
 ## Метрики
 
-### Бизнес-метрики
-```prometheus
-taskpilot_messages_received_total{group_id, source}
-taskpilot_tasks_created_total{group_id, source}
-taskpilot_tasks_updated_total{group_id}
-taskpilot_dependencies_created_total
-```
-
 ### Производительность
 ```prometheus
 taskpilot_agent_latency_seconds{quantile="0.5|0.95|0.99"}
