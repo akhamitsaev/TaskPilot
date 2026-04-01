@@ -43,7 +43,7 @@ graph TD
     WORKER <--> FAISS[FAISS Vector DB]
     WORKER <--> PG[(PostgreSQL)]
     WORKER <--> CB[Circuit Breaker]
-
+```
 ### Обязанности модулей
 
 | Модуль | Технология | Обязанности |
