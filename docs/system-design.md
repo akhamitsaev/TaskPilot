@@ -85,7 +85,7 @@ graph TD
 ## 5. Управление состоянием
 
 ## UnifiedState для передачи данных между узлами
-```mermaid
+```python
 class UnifiedState(TypedDict):
     user_id: str                    # ID пользователя
     group_id: str                   # ID группы
