@@ -130,6 +130,7 @@ class UnifiedState(TypedDict):
 
 
 ## Метрики
+```prometheus
 # Бизнес-метрики
 taskpilot_messages_received_total{group_id, source}
 taskpilot_tasks_created_total{group_id, source}
@@ -152,7 +153,7 @@ taskpilot_retry_count_total{task_name}
 taskpilot_db_pool_connections{state="active|idle"}
 taskpilot_worker_processes{hostname}
 taskpilot_memory_used_bytes{component}
-
+```
 
 ## Ограничения
 
