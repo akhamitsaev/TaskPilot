@@ -59,7 +59,7 @@ graph TD
 ## 4. Поток выполнения (Workflow)
 
 ### Структура графа выполнения
-
+```mermaid
 graph TD
     START --> AUTH[Auth + Rate Limit]
     AUTH -- Valid --> QUEUE[Push to Redis Queue]
@@ -81,11 +81,11 @@ graph TD
     ACCESS -- Allowed --> PG[PostgreSQL Write]
     PG --> NOTIFY[WebSocket Notify]
     NOTIFY --> END
-
+```
 ## 5. Управление состоянием
 
 ## UnifiedState для передачи данных между узлами
-
+```mermaid
 class UnifiedState(TypedDict):
     user_id: str                    # ID пользователя
     group_id: str                   # ID группы
@@ -98,7 +98,7 @@ class UnifiedState(TypedDict):
     action: str                     # create / update / summary
     final_response: str             # Ответ пользователю
     turn_count: int                 # Счётчик итераций (для уточнений)
-
+```
 ## Session State
 
 | Компонент | Хранилище | TTL |
