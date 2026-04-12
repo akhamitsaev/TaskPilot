@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Копируем зависимости и устанавливаем их
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Копируем ВСЮ папку app (включая ui и .streamlit внутри неё)
+COPY app/ ./app/
+
+COPY .streamlit/ ./.streamlit/ 
+
+# Запускаем Streamlit, указывая путь к файлу внутри app
+CMD ["streamlit", "run", "app/ui/streamlit_app.py", "--server.address", "0.0.0.0"]

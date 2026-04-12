@@ -1,0 +1,193 @@
+services:
+  # ============================================================================
+  # PostgreSQL - основное хранилище с RLS
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: taskpilot-postgres
+    environment:
+      POSTGRES_DB: taskpilot
+      POSTGRES_USER: taskpilot
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-taskpilot_secret_123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskpilot -d taskpilot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - taskpilot-net
+    restart: unless-stopped
+
+  # ============================================================================
+  # Redis - очередь задач и кэш
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: taskpilot-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - taskpilot-net
+    restart: unless-stopped
+
+  # ============================================================================
+  # FastAPI Gateway
+  # ============================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: taskpilot-api
+    environment:
+      DATABASE_URL: postgresql://taskpilot:${DB_PASSWORD:-taskpilot_secret_123}@postgres:5432/taskpilot
+      REDIS_URL: redis://redis:6379/0
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+      JWT_SECRET: ${JWT_SECRET:-supersecret32bytesrandomkey12345678}
+      LOG_LEVEL: INFO
+      API_URL: http://localhost:8000
+      UI_URL: http://localhost:8501
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - taskpilot-net
+    restart: unless-stopped
+
+  # ============================================================================
+  # Celery Worker
+  # ============================================================================
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: taskpilot-worker
+    environment:
+      DATABASE_URL: postgresql://taskpilot:${DB_PASSWORD:-taskpilot_secret_123}@postgres:5432/taskpilot
+      REDIS_URL: redis://redis:6379/0
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+      LOG_LEVEL: INFO
+    volumes:
+      - ./logs:/app/logs:rw
+      - ./data:/app/data:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - taskpilot-net
+    restart: unless-stopped
+
+  # ============================================================================
+  # Streamlit UI
+  # ============================================================================
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    container_name: taskpilot-ui
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    networks:
+      - taskpilot-net
+    restart: unless-stopped
+
+  # ============================================================================
+  # Prometheus - сбор метрик
+  # ============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: taskpilot-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+      - worker
+    networks:
+      - taskpilot-net
+    restart: unless-stopped
+
+  # ============================================================================
+  # Grafana - визуализация
+  # ============================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: taskpilot-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - taskpilot-net
+
+  # ============================================================================
+  # cAdvisor - метрики контейнеров (CPU, Memory, Network)
+  # ============================================================================
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: taskpilot-cadvisor
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - taskpilot-net
+    restart: unless-stopped
+
+# ============================================================================
+# Именованные тома 
+# ============================================================================
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  data:
+
+# ============================================================================
+# Сеть
+# ============================================================================
+
+networks:
+  taskpilot-net:
+    driver: bridge

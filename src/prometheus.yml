@@ -1,0 +1,42 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alerts.yml"
+
+scrape_configs:
+  # TaskPilot API
+  - job_name: 'taskpilot-api'
+    static_configs:
+      - targets: ['api:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # TaskPilot Worker
+  - job_name: 'taskpilot-worker'
+    static_configs:
+      - targets: ['worker:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Prometheus (само-мониторинг)
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # cAdvisor (метрики контейнеров)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 15s
+    metric_relabel_configs:
+      - source_labels: [container_label_com_docker_compose_service]
+        target_label: service
+      - source_labels: [container_label_com_docker_compose_project]
+        target_label: project
+
+  # Node Exporter (системные метрики хоста)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['host.docker.internal:9100']

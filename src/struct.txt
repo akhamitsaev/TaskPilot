@@ -1,0 +1,42 @@
+taskpilot/
+├── docker-compose.yml          # Конфиг всех сервисов (Postgres, Redis, API, Worker, UI, Prometheus, Grafana, cAdvisor)
+├── .env                        # Секреты (DB_PASSWORD, MISTRAL_API_KEY, JWT_SECRET и т.д.)
+├── requirements.txt            # Зависимости Python
+├── prometheus.yml              # Конфиг сбора метрик (лежит в корне!)
+├── init.sql                    # Скрипт инициализации БД (если нужен)
+│
+├── app/                        # ОСНОВНОЙ КОД ПРИЛОЖЕНИЯ
+│   ├── __init__.py             # Пустой файл-маркер пакета
+│   ├── main.py                 # Точка входа FastAPI (создан выше)
+│   ├── config.py               # Настройки (Pydantic Settings)
+│   │
+│   ├── db/                     # Работа с БД
+│   │   ├── __init__.py
+│   │   ├── engine.py           # Движок SQLAlchemy, сессии
+│   │   ├── models.py           # Модели таблиц (User, Task, Group...)
+│   │   └── task_repository.py  # CRUD операции
+│   │
+│   ├── worker/                 # Celery воркеры и Агент
+│   │   ├── __init__.py
+│   │   ├── celery_app.py       # Конфигурация Celery
+│   │   ├── tasks.py            # Задачи Celery (process_message)
+│   │   └── agent.py            # LLM Агент (классификация, извлечение сущностей)
+│   │
+│   ├── infrastructure/         # ИНФРАСТРУКТУРА (Критически важно!)
+│   │   ├── __init__.py         # Экспорты (llm_circuit_breaker и др.)
+│   │   ├── metrics.py          # Прометей метрики (TTFT, TPOT, Cost...)
+│   │   ├── circuit_breaker.py  # Паттерн Circuit Breaker для защиты LLM
+│   │   └── rate_limiter.py     # Rate Limiting (защита от перегрузки)
+│   │
+│   └── ui/                     # Streamlit интерфейс (внутри app!)
+│       ├── streamlit_app.py    # Код приложения чата
+│       └── .streamlit/         # Конфиг Streamlit
+│           └── secrets.toml    # Секреты для UI (API_URL)
+│
+└── grafana/
+    └── provisioning/
+        ├── dashboards/
+        │   ├── dashboard.yml   # Провайдер дашбордов
+        │   └── taskpilot.json  # Ваш рабочий дашборд с метриками
+        └── datasources/
+            └── datasource.yml  # Подключение Prometheus
