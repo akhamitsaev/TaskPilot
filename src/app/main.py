@@ -8,6 +8,7 @@ from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import uuid
@@ -30,11 +31,17 @@ from app.infrastructure.metrics import (
     update_circuit_breaker_metrics,
 )
 
-# Импорт инфраструктуры (Circuit Breaker) - ИСПРАВЛЕНО: отдельный импорт!
+# Импорт инфраструктуры (Circuit Breaker)
 from app.infrastructure.circuit_breaker import llm_circuit_breaker, CircuitState
 
 # Импорт rate limiter
 from app.infrastructure.rate_limiter import limiter, rate_limit_exception_handler
+
+# Импорт auth router
+from app.api.auth import router as auth_router
+
+# Импорт health router
+from app.api.health import router as health_router
 
 logger = structlog.get_logger(__name__)
 
@@ -54,7 +61,6 @@ app = FastAPI(
 # Middleware Setup
 # ============================================================================
 
-# 1. CORS (разрешаем запросы от Streamlit UI и других источников)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -63,15 +69,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 2. Metrics Middleware (сбор метрик HTTP)
 app.add_middleware(MetricsMiddleware)
 
-# 3. Rate Limiter (защита от перегрузки)
 app.state.limiter = limiter
 app.add_exception_handler(429, rate_limit_exception_handler)
 
 # ============================================================================
-# Pydantic Models (Request/Response)
+# Pydantic Models
 # ============================================================================
 
 class ChatMessageRequest(BaseModel):
@@ -100,26 +104,19 @@ class TaskListResponse(BaseModel):
     total: int
 
 # ============================================================================
-# Event Handlers (Startup/Shutdown)
+# Event Handlers
 # ============================================================================
 
 @app.on_event("startup")
 async def startup_event():
-    """Инициализация при старте приложения"""
     logger.info("taskpilot_api_starting")
-    
-    # Настройка OpenTelemetry
     setup_opentelemetry()
-    
-    # Инициализация БД
     try:
         init_db()
         logger.info("database_initialized")
     except Exception as e:
         logger.error("database_init_failed", error=str(e))
     
-    # Обновление метрик Circuit Breaker при старте
-    # ВАЖНО: CircuitState.value возвращает строку ("closed"), а Prometheus ждёт число (0, 1, 2)
     from app.infrastructure.circuit_breaker import CircuitState
     cb_state = llm_circuit_breaker.get_state()
     state_numeric = {
@@ -137,9 +134,11 @@ async def shutdown_event():
 # Routes
 # ============================================================================
 
+app.include_router(auth_router)
+app.include_router(health_router)
+
 @app.get("/")
 async def root():
-    """Root endpoint"""
     return {
         "service": "TaskPilot API",
         "version": "0.2.0",
@@ -154,7 +153,8 @@ async def health_ready(db: Session = Depends(get_db)):
     components = {}
     
     try:
-        db.execute("SELECT 1")
+        # Исправлено: обёрнуто в text()
+        db.execute(text("SELECT 1"))
         components["database"] = True
     except Exception as e:
         components["database"] = False
@@ -175,7 +175,6 @@ async def health_ready(db: Session = Depends(get_db)):
 
 @app.get("/metrics")
 async def metrics_endpoint():
-    """Prometheus Metrics Endpoint"""
     return get_metrics_response()
 
 @app.post("/chat", response_model=ChatMessageResponse)
@@ -185,7 +184,6 @@ async def chat(
     body: ChatMessageRequest,
     db: Session = Depends(get_db)
 ):
-    """Отправка сообщения в чат"""
     try:
         user_id = uuid.UUID(body.user_id)
         group_id = uuid.UUID(body.group_id)
@@ -209,7 +207,7 @@ async def chat(
             error=result.get("error")
         )
         
-    except uuid.UUIDError:
+    except ValueError:   # <-- исправлено с uuid.UUIDError на ValueError
         raise HTTPException(status_code=400, detail="Invalid UUID format")
     
     except Exception as e:
@@ -241,7 +239,6 @@ async def get_tasks(
     limit: int = 20,
     db: Session = Depends(get_db)
 ):
-    """Получение списка задач пользователя"""
     try:
         user_uuid = uuid.UUID(user_id)
         group_uuid = uuid.UUID(group_id)
@@ -263,7 +260,7 @@ async def get_tasks(
             ],
             total=len(tasks)
         )
-    except uuid.UUIDError:
+    except ValueError:   # <-- исправлено с uuid.UUIDError на ValueError
         raise HTTPException(status_code=400, detail="Invalid UUID format")
     except Exception as e:
         logger.error("get_tasks_failed", error=str(e))
