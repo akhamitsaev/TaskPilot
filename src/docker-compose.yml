@@ -98,7 +98,7 @@ services:
     restart: unless-stopped
 
   # ============================================================================
-  # Streamlit UI
+  # Streamlit UI (с поддержкой переменной окружения)
   # ============================================================================
   ui:
     build:
@@ -106,9 +106,11 @@ services:
       dockerfile: Dockerfile.ui
     container_name: taskpilot-ui
     environment:
-      API_URL: http://api:8000
+      API_URL: http://host.docker.internal:8000
     ports:
       - "8501:8501"
+    volumes:
+      - ./app/ui/streamlit_app.py:/app/app/ui/streamlit_app.py
     depends_on:
       - api
     networks:
@@ -116,15 +118,13 @@ services:
     restart: unless-stopped
 
   # ============================================================================
-  # Prometheus - сбор метрик
+  # Prometheus
   # ============================================================================
   prometheus:
     image: prom/prometheus:latest
     container_name: taskpilot-prometheus
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
-      - prometheus_data:/prometheus
     ports:
       - "9090:9090"
     depends_on:
@@ -135,7 +135,7 @@ services:
     restart: unless-stopped
 
   # ============================================================================
-  # Grafana - визуализация
+  # Grafana
   # ============================================================================
   grafana:
     image: grafana/grafana:latest
@@ -155,7 +155,7 @@ services:
       - taskpilot-net
 
   # ============================================================================
-  # cAdvisor - метрики контейнеров (CPU, Memory, Network)
+  # cAdvisor
   # ============================================================================
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -173,20 +173,12 @@ services:
       - taskpilot-net
     restart: unless-stopped
 
-# ============================================================================
-# Именованные тома 
-# ============================================================================
-
 volumes:
   postgres_data:
   redis_data:
   prometheus_data:
   grafana_data:
   data:
-
-# ============================================================================
-# Сеть
-# ============================================================================
 
 networks:
   taskpilot-net:
